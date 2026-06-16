@@ -1,0 +1,48 @@
+
+name: Update Live Stream URL
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Run scraper
+        run: python scraper.py
+
+      - name: Update index.html with new URL
+        run: |
+          if [ -f stream_url.txt ]; then
+            STREAM_URL=$(cat stream_url.txt)
+            ESCAPED_URL=$(printf '%s\n' "$STREAM_URL" | sed -e 's/[\/&]/\\&/g')
+            sed -i "s/PLACEHOLDER_STREAM_URL/$ESCAPED_URL/" index.html
+          else
+            exit 1
+          fi
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --staged --quiet || git commit -m "Auto-update stream URL [skip ci]"
+          git push
